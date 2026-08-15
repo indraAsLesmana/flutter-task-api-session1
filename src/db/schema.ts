@@ -1,0 +1,34 @@
+import {
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from "drizzle-orm/pg-core";
+
+export const classes = pgTable(
+  "classes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tingkat: varchar("tingkat", { length: 5 }).notNull(), // 'X', 'XI', 'XII'
+    namaKelas: varchar("nama_kelas", { length: 5 }).notNull(), // 'a', 'b', 'c', 'd'
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("tingkat_nama_kelas_idx").on(table.tingkat, table.namaKelas),
+  ],
+);
+
+export const users = pgTable("users", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  nama: varchar("nama", { length: 100 }).notNull(),
+  role: varchar("role", { length: 10 }).notNull(), // 'guru' | 'siswa'
+  nipNik: varchar("nip_nik", { length: 50 }).notNull().unique(),
+  email: varchar("email", { length: 100 }),
+  passwordHash: text("password_hash").notNull(),
+  classId: uuid("class_id").references(() => classes.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
