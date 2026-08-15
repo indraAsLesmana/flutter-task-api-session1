@@ -63,6 +63,12 @@ Push the Drizzle schema to your Neon database:
 npm run db:push
 ```
 
+Push seed to Drizzle to your Neon database:
+
+```bash
+npm run db:seed
+```
+
 ## Run locally
 
 ```bash

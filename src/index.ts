@@ -1,22 +1,25 @@
-import { Hono } from 'hono';
-import { getDb } from './db/client';
-import { todos } from './db/schema';
-
-const db = getDb();
+import { neon } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { classes } from "./db/schema";
 
 const app = new Hono();
+app.use("*", cors());
 
-app.get('/', (c) => c.text('Neon + Hono + Drizzle'));
+function getDb() {
+  const sql = neon(process.env.DATABASE_URL!);
+  return drizzle(sql);
+}
 
-app.post('/todos', async (c) => {
-  const { text: body } = await c.req.json<{ text: string }>();
-  const [row] = await db.insert(todos).values({ text: body }).returning();
-  return c.json(row, 201);
-});
-
-app.get('/todos', async (c) => {
-  const rows = await db.select().from(todos);
-  return c.json(rows);
+app.get("/api/classes", async (c) => {
+  const db = getDb();
+  try {
+    const data = await db.select().from(classes);
+    return c.json({ success: true, data });
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500);
+  }
 });
 
 export default app;
