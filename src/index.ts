@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { classes, users } from "./db/schema";
+import { classes, tasks, users } from "./db/schema";
 
 const app = new Hono();
 app.use("*", cors());
@@ -64,6 +64,42 @@ app.post("/api/auth/login", async (c) => {
     }
 
     return c.json({ success: true, data: foundUsers[0] }, 200);
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500);
+  }
+});
+
+app.post("/api/tasks", async (c) => {
+  const db = getDb();
+  const {
+    guruId,
+    classId,
+    description,
+    startDate,
+    endDate,
+    attachmentUrl,
+    isTeamTask,
+    maxTeamMembers,
+  } = await c.req.json();
+
+  try {
+    const newTask = await db
+      .insert(tasks)
+      .values({
+        guruId,
+        classId,
+        description,
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        attachmentUrl: attachmentUrl || null,
+        isTeamTask: isTeamTask ?? false,
+        maxTeamMembers: maxTeamMembers
+          ? parseInt(maxTeamMembers.toString(), 10)
+          : 5,
+      })
+      .returning();
+
+    return c.json({ success: true, data: newTask[0] }, 201);
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500);
   }

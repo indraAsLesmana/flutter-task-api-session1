@@ -1,4 +1,6 @@
 import {
+  boolean,
+  integer,
   pgTable,
   text,
   timestamp,
@@ -30,5 +32,22 @@ export const users = pgTable("users", {
   classId: uuid("class_id").references(() => classes.id, {
     onDelete: "set null",
   }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const tasks = pgTable("tasks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  guruId: uuid("guru_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  classId: uuid("class_id")
+    .notNull()
+    .references(() => classes.id, { onDelete: "cascade" }),
+  description: text("description").notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  attachmentUrl: text("attachment_url"),
+  isTeamTask: boolean("is_team_task").default(false).notNull(),
+  maxTeamMembers: integer("max_team_members").default(5).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
