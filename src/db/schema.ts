@@ -51,3 +51,35 @@ export const tasks = pgTable("tasks", {
   maxTeamMembers: integer("max_team_members").default(5).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// 4. Tabel Submissions
+export const submissions = pgTable("submissions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  taskId: uuid("task_id")
+    .notNull()
+    .references(() => tasks.id, { onDelete: "cascade" }),
+  siswaId: uuid("siswa_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  submitUrl: text("submit_url").notNull(),
+  notes: text("notes"),
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+});
+
+// 5. Tabel Submission Members (Team Task Members)
+export const submissionMembers = pgTable(
+  "submission_members",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    submissionId: uuid("submission_id")
+      .notNull()
+      .references(() => submissions.id, { onDelete: "cascade" }),
+    siswaId: uuid("siswa_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("submission_siswa_idx").on(table.submissionId, table.siswaId),
+  ],
+);
