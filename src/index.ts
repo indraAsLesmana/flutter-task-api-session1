@@ -214,4 +214,94 @@ app.get("/api/tasks", async (c) => {
   }
 });
 
+app.get("/api/tasks/:id/submissions", async (c) => {
+  const db = getDb();
+  const taskId = c.req.param("id");
+
+  try {
+    const taskData = await db.select().from(tasks).where(eq(tasks.id, taskId));
+    if (taskData.length === 0) {
+      return c.json({ success: false, message: "Tugas tidak ditemukan" }, 404);
+    }
+    const task = taskData[0];
+
+    const studentsInClass = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.role, "siswa"), eq(users.classId, task.classId)));
+
+    const taskSubmissions = await db
+      .select()
+      .from(submissions)
+      .where(eq(submissions.taskId, taskId));
+
+    const subIds = taskSubmissions.map((s) => s.id);
+    const memberMap = new Map<string, any[]>();
+
+    if (subIds.length > 0) {
+      const membersWithUser = await db
+        .select({
+          submissionId: submissionMembers.submissionId,
+          siswaId: users.id,
+          nama: users.nama,
+          nipNik: users.nipNik,
+        })
+        .from(submissionMembers)
+        .innerJoin(users, eq(submissionMembers.siswaId, users.id))
+        .where(inArray(submissionMembers.submissionId, subIds));
+
+      for (const m of membersWithUser) {
+        if (!memberMap.has(m.submissionId)) {
+          memberMap.set(m.submissionId, []);
+        }
+        memberMap.get(m.submissionId)!.push({
+          siswaId: m.siswaId,
+          nama: m.nama,
+          nipNik: m.nipNik,
+        });
+      }
+    }
+
+    const studentSubmissionMap = new Map<
+      string,
+      { sub: any; members: any[] }
+    >();
+
+    for (const sub of taskSubmissions) {
+      const members = memberMap.get(sub.id) || [];
+      studentSubmissionMap.set(sub.siswaId, { sub, members });
+      for (const m of members) {
+        if (!studentSubmissionMap.has(m.siswaId)) {
+          studentSubmissionMap.set(m.siswaId, { sub, members });
+        }
+      }
+    }
+
+    const studentList = studentsInClass.map((student) => {
+      const entry = studentSubmissionMap.get(student.id);
+      return {
+        siswaId: student.id,
+        nama: student.nama,
+        nipNik: student.nipNik,
+        email: student.email,
+        isSubmitted: !!entry,
+        submitUrl: entry ? entry.sub.submitUrl : null,
+        notes: entry ? entry.sub.notes : null,
+        submittedAt: entry ? entry.sub.submittedAt : null,
+        teamMembers: entry ? entry.members : [],
+      };
+    });
+
+    return c.json({
+      success: true,
+      data: {
+        task,
+        students: studentList,
+      },
+    });
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500);
+  }
+});
+
 export default app;
