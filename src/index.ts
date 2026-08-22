@@ -304,4 +304,70 @@ app.get("/api/tasks/:id/submissions", async (c) => {
   }
 });
 
+app.post("/api/submissions", async (c) => {
+  const db = getDb();
+  const { taskId, siswaId, submitUrl, notes, teamMemberIds } =
+    await c.req.json();
+
+  try {
+    const existingDirect = await db
+      .select()
+      .from(submissions)
+      .where(
+        and(eq(submissions.taskId, taskId), eq(submissions.siswaId, siswaId)),
+      );
+
+    let resultSubmission;
+    if (existingDirect.length > 0) {
+      const updated = await db
+        .update(submissions)
+        .set({
+          submitUrl,
+          notes: notes || null,
+          submittedAt: new Date(),
+        })
+        .where(eq(submissions.id, existingDirect[0].id))
+        .returning();
+      resultSubmission = updated[0];
+    } else {
+      const inserted = await db
+        .insert(submissions)
+        .values({
+          taskId,
+          siswaId,
+          submitUrl,
+          notes: notes || null,
+        })
+        .returning();
+      resultSubmission = inserted[0];
+    }
+
+    // Save team members in submission_members junction table
+    const rawList = Array.isArray(teamMemberIds)
+      ? [siswaId, ...teamMemberIds]
+      : [siswaId];
+    const memberList: string[] = Array.from(
+      new Set(
+        rawList
+          .filter((id) => id && typeof id === "string" && id.trim().length > 0)
+          .map((id) => id.trim()),
+      ),
+    );
+
+    await db
+      .delete(submissionMembers)
+      .where(eq(submissionMembers.submissionId, resultSubmission.id));
+
+    const memberRows = memberList.map((mId: string) => ({
+      submissionId: resultSubmission.id,
+      siswaId: mId,
+    }));
+    await db.insert(submissionMembers).values(memberRows);
+
+    return c.json({ success: true, data: resultSubmission }, 201);
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500);
+  }
+});
+
 export default app;
