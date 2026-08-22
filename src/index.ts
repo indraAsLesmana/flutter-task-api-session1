@@ -1,5 +1,5 @@
 import { neon } from "@neondatabase/serverless";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, ilike, inArray, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -365,6 +365,47 @@ app.post("/api/submissions", async (c) => {
     await db.insert(submissionMembers).values(memberRows);
 
     return c.json({ success: true, data: resultSubmission }, 201);
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500);
+  }
+});
+
+app.get("/api/students/search", async (c) => {
+  const db = getDb();
+  const classId = c.req.query("classId");
+  const query = c.req.query("query") || "";
+
+  if (!classId) {
+    return c.json(
+      { success: false, message: "classId query parameter is required" },
+      400,
+    );
+  }
+
+  try {
+    const conditions = [eq(users.role, "siswa"), eq(users.classId, classId)];
+
+    if (query.trim()) {
+      const pattern = `%${query.trim()}%`;
+      conditions.push(
+        or(ilike(users.nama, pattern), ilike(users.nipNik, pattern))!,
+      );
+    }
+
+    const result = await db
+      .select({
+        id: users.id,
+        siswaId: users.id,
+        nama: users.nama,
+        nipNik: users.nipNik,
+        email: users.email,
+        classId: users.classId,
+      })
+      .from(users)
+      .where(and(...conditions))
+      .limit(20);
+
+    return c.json({ success: true, data: result });
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500);
   }
